@@ -1,7 +1,7 @@
 SurvivalGames
 =============
 
-A minigane plugin mainly developed by [DinoKill](https://github.com/DinoKill).
+A minigame plugin mainly developed by [DinoKill](https://github.com/DinoKill).
 
 Player's first go into the lobby where they wait for other players and vote for a map to be used for the game.
 
