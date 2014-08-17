@@ -173,9 +173,5 @@ class Arena {
 			}
 		}
 	}
-	
-	public function __destruct() {
-			
-	}
-	
+
 }
