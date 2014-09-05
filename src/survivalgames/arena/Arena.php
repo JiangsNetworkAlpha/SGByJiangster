@@ -169,7 +169,7 @@ class Arena {
 		$tiles = $this->level->getTiles();
 		foreach($tiles as $t) {
 			if($t instanceof Chest) {
-				$this->refillChests($t);
+				$this->refillChest($t); //:D
 			}
 		}
 	}
