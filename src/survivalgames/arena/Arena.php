@@ -14,29 +14,32 @@ use pocketmine\nbt\tag\Compound;
 use pocketmine\nbt\tag\Enum;
 use pocketmine\nbt\tag\Byte;
 use pocketmine\nbt\tag\Double;
+use pocketmine\item\Item;
 
-class Arena {	
-	private static $arenas = [];	
+class Arena {
+	private $plugin;
+	
 	private $players = [];
 	private $started = false;
 	private $level;
-	private $map;
+	private $mapFilename;
 	private $id;
 	public $maxPlayers = 20;
 	
 	
-	public function __construct(string $map) {
-    	$async = new MapCopyTask($map);
-    	Server::getInstance()->getScheduler()->scheduleAsyncTask($async);
-    	Server::getInstance()->loadLevel($async->getResult());
-    	$this->level = Server::getInstance()->getLevel($async->getResult());
-    	$this->map = $map;
-    	$this->refillAllChests();  
-    	$this->id = count(self::$arenas);  		
-    	array_push(self::$arenas, $this);
+	public function __construct(Main $plugin, $id, $originalMapFilename) {
+		$this->plugin = $plugin;
+		$this->id = $id;
+		$this->mapFilename = "temp_arena$id";
+		
+    	$copyMap = new MapCopyTask($this->mapFilename, $originalMapFilename);
+    	$this->getServer()->getScheduler()->scheduleAsyncTask($copyMap);
+    	$this->getServer()->loadLevel($this->mapFilename);
+    	$this->level = $this->getServer()->getLevel($this->mapFilename);
+    	$this->refillAllChests();
 	}
 	
-	public function update() {
+	public function tick() {
 		foreach(array_keys($this->players) as $key) {
 			$player = $this->players[$key]["obj"];
 			if(!$player->isOnline()) {
@@ -58,9 +61,9 @@ class Arena {
 		foreach(array_keys($this->players) as $key) {
 	    	$this->removePlayer($this->players[$key]["obj"], false);
 		}
-		Server::getInstance()->unloadLevel($this->level);
-		$dir = join(DIRECTORY_SEPARATOR, ".", "worlds", "");
-		unlink($dir . $this->map);
+		$this->getServer()->unloadLevel($this->level);
+		unlink("./worlds/" . $mapFilename);
+		$this->plugin->getArenaList()->remove($this); // Suicide!
 	}
 	
 	public function startDeathmatch() {
@@ -85,27 +88,28 @@ class Arena {
 				return false;
 			}
 		}
-		if(!$player->isOnline()) {
-			return false;
-		}
+		
 		$this->players[$player->getName()]["obj"] = $player;
 		$this->players[$player->getName()]["pos"] = new Vector3($player->getX(), $player->getY(), $player->getZ());
 		$this->players[$player->getName()]["level"] = $player->getLevel();
 		$this->players[$player->getName()]["inventory"] = $player->getInventory();
+		
 		return true;
 	}
 	
-	public function removePlayer(Player $player, boolean $drop = true) {
+	public function removePlayer(Player $player, $drop = true) {
 		if(!$this->isInArena($player)) {
 			return false;
 		}
 		$inv = $this->players[$player->getName()]["inventory"];
+		
 		for($slot = 0; $slot < $inv->getSize(); $slot++) {
-			if($drop) {
-				$e = new DroppedItem($this->level, new Compound("DroppedItem", array( // Drop items out of inventory
+				
+			if($drop) { // Drop items out of inventory...
+				$e = new DroppedItem($this->level, new Compound("DroppedItem", array( 
 				 		new Enum("Pos", array(
 							new Double(0, $player->x - 3 + rand(0, 6)),
-							new Double(1, $player->y - 3 + rand(0, 6)),
+							new Double(1, $player->y),
 							new Double(2, $player->z - 3 + rand(0, 6))
 						)),
 						new String("Thrower", $player->getName()),
@@ -116,23 +120,25 @@ class Arena {
 						)) 
 				)));			
 			}
+			
 			$player->getInventory->setItem($slot, $inv->getItem($slot));
 		}
+
 		$player->teleport($this->players[$player->getName()]["pos"]);
 		$player->setLevel($this->players[$player->getName()]["level"]);
 		unset($this->players[$player->getName()]);
 		return true;
 	}
 
-	public function kickPlayer(Player $player, string $reason) {
-		$player->sendChat("You've been kicked from the game. Reason: " + $reason + ".");
+	public function kickPlayer(Player $player, $reason) {
+		$player->sendMessage("You've been kicked from the game. Reason: " + $reason + ".");
 		$this->removePlayer($player);
 	}
 	
-	public function refillChest(Chest $chest) {
+	public function refillChest(Chest $chest, $refillPair = true) {
 		$replaceSlots = [];
 		for($slot = 0; $slot < $chest->getSize(); $slot++) {
-			$chest->setItem($slot, new Air()); // Clear chest first.
+			$chest->setItem($slot, Item::get(Item::AIR, 0, 0)); // Clear chest first.
 			$chance = rand(0, 5);
 			if($chance == 0) {
 				array_push($replaceSlots, $slot);
@@ -145,23 +151,8 @@ class Arena {
 			$item = null; // TODO: Decide items to put in chest.
 			$chest->setItem($slot, $item);		
 		}
-		if($chest->isPaired()) { // Large chests
-			$chest = $chest->getPair();
-		    $replaceSlots = [];
-			for($slot = 0; $slot < $chest->getSize(); $slot++) {
-				$chest->setItem($slot, new Air());
-				$chance = rand(0, 5);
-				if($chance == 0) {
-					array_push($replaceSlots, $slot);
-				}
-			}
-			if(count($replaceSlots) >= $chest->getSize() / 2) {
-				array_slice($replaceSlots, $chest->getSize() / 2 - 1);
-			}
-			foreach($replaceSlots as $slot) {
-				$item = null;
-				$chest->setItem($slot, $item);		
-			}
+		if($chest->isPaired() && $refillPair) { // Large chests
+			$this->refillChest($chest->getPair(), false);
 		}
 	}
     
@@ -169,9 +160,13 @@ class Arena {
 		$tiles = $this->level->getTiles();
 		foreach($tiles as $t) {
 			if($t instanceof Chest) {
-				$this->refillChest($t); //:D
+				$this->refillChest($t);
 			}
 		}
 	}
 
+	private function getServer() {
+		return $this->plugin->getServer();	
+	}
+	
 }
