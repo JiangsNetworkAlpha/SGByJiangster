@@ -137,13 +137,7 @@ class Arena {
 	
 	public function refillChest(Chest $chest, $refillPair = true) {
 		$replaceSlots = [];
-		for($slot = 0; $slot < $chest->getSize(); $slot++) {
-			$chest->setItem($slot, Item::get(Item::AIR, 0, 0)); // Clear chest first.
-			$chance = rand(0, 5);
-			if($chance == 0) {
-				array_push($replaceSlots, $slot);
-			}
-		}
+		$chest->clearAll();
 		if(count($replaceSlots) >= $chest->getSize() / 2) {
 			array_slice($replaceSlots, $chest->getSize() / 2 - 1);
 		}
