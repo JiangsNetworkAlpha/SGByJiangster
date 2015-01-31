@@ -131,7 +131,7 @@ class Arena {
 	}
 
 	public function kickPlayer(Player $player, $reason) {
-		$player->sendMessage("You've been kicked from the game. Reason: " + $reason + ".");
+		$player->sendMessage("You've been kicked from the game. Reason: " . $reason . ".");
 		$this->removePlayer($player);
 	}
 	
