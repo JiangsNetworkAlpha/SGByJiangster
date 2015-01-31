@@ -4,8 +4,9 @@ namespace survivalgames;
 
 use pocketmine\plugin\PluginBase;
 use pocketmine\command\CommandSender;
+use pocketmine\event\Listener;
 
-class Main extends PluginBase {
+class Main extends PluginBase implements Listener {
 	private $arenaList;
 	private $commandMap = [];
 	
