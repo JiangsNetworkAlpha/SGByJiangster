@@ -5,6 +5,10 @@ namespace survivalgames;
 use pocketmine\plugin\PluginBase;
 use pocketmine\command\CommandSender;
 use pocketmine\command\Command;
+use survivalgames\command\JoinArenaCommand;
+use survivalgames\task\MapCopyTask;
+use survivalgames\arena\Arean;
+use survivalgames\arena\ArenaList;
 
 class Main extends PluginBase {
 	private $arenaList;
